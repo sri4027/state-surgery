@@ -3,7 +3,7 @@
 **DataForge 2026 · Pathway Track "Explain the Frontier"**
 Topic: **Skill Acquisition from Demonstrations + Test-Time Adaptation**
 
-**Live artifact:** https://claude.ai/code/artifact/51fdc852-9592-4b6c-b2c1-9f107a19b02f
+**Live artifact:** https://state-surgery.netlify.app/
 (opens without sign-in; all inference runs in the browser)
 
 ---

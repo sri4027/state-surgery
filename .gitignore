@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+# checkpoint IS committed: judges can build the artifact without retraining
+*.tar.gz
+.DS_Store

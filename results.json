@@ -1,0 +1,263 @@
+{
+ "meta": {
+  "checkpoint": "main.pt",
+  "eval_seed": 20260908,
+  "grid": "6x6",
+  "colors": 10,
+  "ops": [
+   "identity",
+   "hflip",
+   "vflip",
+   "rot180",
+   "transpose"
+  ],
+  "trained_R_range": [
+   1,
+   5
+  ],
+  "default_R": 4,
+  "default_demos": 3
+ },
+ "E1_demo_count": {
+  "0": {
+   "cell": 0.6188,
+   "strict_grid": 0.0
+  },
+  "1": {
+   "cell": 0.9848,
+   "strict_grid": 0.8477
+  },
+  "2": {
+   "cell": 0.9989,
+   "strict_grid": 0.9883
+  },
+  "3": {
+   "cell": 0.9998,
+   "strict_grid": 0.9961
+  }
+ },
+ "E2_ablations": {
+  "correct_state": {
+   "cell": 0.9992,
+   "grid": 0.9883
+  },
+  "zero_state": {
+   "cell": 0.6126,
+   "grid": 0.0
+  },
+  "wrong_task_state": {
+   "cell": 0.6238,
+   "grid": 0.0
+  },
+  "random_state": {
+   "cell": 0.551,
+   "grid": 0.0
+  }
+ },
+ "E3_transplant": {
+  "native_vs_ruleB": {
+   "cell": 1.0,
+   "grid": 1.0
+  },
+  "transplant_vs_ruleB": {
+   "cell": 0.6316,
+   "grid": 0.0
+  },
+  "transplant_vs_ruleA_on_B": {
+   "cell": 1.0,
+   "grid": 1.0
+  },
+  "rule_collision_rate": 0.0,
+  "n": 256,
+  "design": "A and B share a palette but have different permutations, so every colour in B's query is bound by A's state"
+ },
+ "E4_depth": {
+  "1": {
+   "cell": 0.9993,
+   "strict_grid": 0.9948,
+   "trained_range": true
+  },
+  "2": {
+   "cell": 0.9993,
+   "strict_grid": 0.9948,
+   "trained_range": true
+  },
+  "3": {
+   "cell": 0.9993,
+   "strict_grid": 0.9948,
+   "trained_range": true
+  },
+  "4": {
+   "cell": 0.9993,
+   "strict_grid": 0.9948,
+   "trained_range": true
+  },
+  "5": {
+   "cell": 0.9993,
+   "strict_grid": 0.9948,
+   "trained_range": true
+  },
+  "6": {
+   "cell": 0.9993,
+   "strict_grid": 0.9948,
+   "trained_range": false
+  },
+  "7": {
+   "cell": 0.9993,
+   "strict_grid": 0.9948,
+   "trained_range": false
+  },
+  "8": {
+   "cell": 0.9993,
+   "strict_grid": 0.9948,
+   "trained_range": false
+  }
+ },
+ "E5_coverage": {
+  "short_context": {
+   "cell_all": 0.9121,
+   "cell_covered": 0.9996,
+   "cell_uncovered": 0.0,
+   "strict_grid": 0.0234
+  },
+  "supported_context": {
+   "cell_all": 0.9991,
+   "cell_covered": 0.9996,
+   "cell_uncovered": 0.9938,
+   "strict_grid": 0.9883
+  },
+  "uncovered_cells_per_grid": 3.15,
+  "chance_on_uncovered": 0.1111,
+  "n": 256,
+  "note": "query grids byte-identical across the two conditions"
+ },
+ "E6_consistency": {
+  "pair_accuracy": 0.9987,
+  "strict_task_accuracy": 0.9961,
+  "gap_points": 0.26,
+  "partial_tasks": 0.0039,
+  "n": 256
+ },
+ "E7_leakage": {
+  "baseline": {
+   "cell": 0.9997,
+   "grid": 0.9948
+  },
+  "reversed_demo_order": {
+   "cell": 0.9996,
+   "grid": 0.9896
+  },
+  "order_invariant_by_construction": true,
+  "order_note": "our write is a sum of outer products, so S is exactly permutation-invariant over demonstration tokens; BDH-CQ states its memory is order-dependent (Eq. 1). Documented difference, not a result.",
+  "palette_size_6": {
+   "cell": 0.9994,
+   "grid": 0.9896
+  },
+  "distinct_permutations": 362880
+ },
+ "E8_param_identity": {
+  "sha256_before": "8abcd66cc170c758b5b3885b8bd564a3debaee5f181016cd012abad35d626dd3",
+  "sha256_after": "8abcd66cc170c758b5b3885b8bd564a3debaee5f181016cd012abad35d626dd3",
+  "identical": true,
+  "delta_theta_l2": 0.0,
+  "delta_S_l2_mean": 656197.75,
+  "n_params": 298720,
+  "state_entries": 16384
+ },
+ "E9_capacity": {
+  "2": {
+   "cell": 1.0,
+   "strict_grid": 1.0,
+   "in_training_range": false
+  },
+  "3": {
+   "cell": 1.0,
+   "strict_grid": 1.0,
+   "in_training_range": true
+  },
+  "4": {
+   "cell": 1.0,
+   "strict_grid": 1.0,
+   "in_training_range": true
+  },
+  "5": {
+   "cell": 0.9997,
+   "strict_grid": 0.9948,
+   "in_training_range": true
+  },
+  "6": {
+   "cell": 0.9991,
+   "strict_grid": 0.9896,
+   "in_training_range": true
+  },
+  "7": {
+   "cell": 1.0,
+   "strict_grid": 1.0,
+   "in_training_range": false
+  },
+  "8": {
+   "cell": 0.9984,
+   "strict_grid": 0.9844,
+   "in_training_range": false
+  },
+  "9": {
+   "cell": 0.9983,
+   "strict_grid": 0.974,
+   "in_training_range": false
+  }
+ },
+ "E10_state_growth": {
+  "0": 0.0,
+  "1": 221624.625,
+  "2": 454703.125,
+  "3": 669579.0
+ },
+ "E11_interference": {
+  "1": {
+   "cell": 0.9994,
+   "strict_grid": 0.9948
+  },
+  "2": {
+   "cell": 0.9081,
+   "strict_grid": 0.3594
+  },
+  "3": {
+   "cell": 0.8503,
+   "strict_grid": 0.1927
+  },
+  "4": {
+   "cell": 0.8105,
+   "strict_grid": 0.099
+  },
+  "5": {
+   "cell": 0.7714,
+   "strict_grid": 0.0729
+  },
+  "6": {
+   "cell": 0.7614,
+   "strict_grid": 0.0312
+  }
+ },
+ "E12_readout": {
+  "0": {
+   "all9": 0.092,
+   "colours_in_palette": 0.0955,
+   "colours_never_shown": 0.0851
+  },
+  "1": {
+   "all9": 0.6123,
+   "colours_in_palette": 0.9184,
+   "colours_never_shown": 0.0
+  },
+  "2": {
+   "all9": 0.6615,
+   "colours_in_palette": 0.9922,
+   "colours_never_shown": 0.0
+  },
+  "3": {
+   "all9": 0.6649,
+   "colours_in_palette": 0.9974,
+   "colours_never_shown": 0.0
+  }
+ }
+}

@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>State Surgery — where does a rule live?</title>
+<style>
+:root{
+  --bg:#f7f7f9;--fg:#16161a;--mut:#5d5d68;--line:#dcdce4;--card:#ffffff;
+  --acc:#5b2bd9;--ok:#0a7f4f;--bad:#c0243a;--warn:#9a6b00;--chip:#eeeef4;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0e0e12;--fg:#ececf2;--mut:#9a9aa8;--line:#26262f;--card:#16161d;
+  --acc:#a78bfa;--ok:#3ddc97;--bad:#ff6b7f;--warn:#e0b341;--chip:#1e1e27;}}
+:root[data-theme="dark"]{--bg:#0e0e12;--fg:#ececf2;--mut:#9a9aa8;--line:#26262f;
+  --card:#16161d;--acc:#a78bfa;--ok:#3ddc97;--bad:#ff6b7f;--warn:#e0b341;--chip:#1e1e27;}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--sans);
+  line-height:1.55;-webkit-text-size-adjust:100%}
+.wrap{max-width:960px;margin:0 auto;padding:0 18px 80px}
+header{border-bottom:1px solid var(--line);background:var(--card);position:sticky;top:0;z-index:20}
+.hd{max-width:960px;margin:0 auto;padding:12px 18px;display:flex;gap:14px;
+  align-items:center;flex-wrap:wrap}
+.kicker{font:600 11px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--acc)}
+h1{font-size:clamp(21px,3.4vw,30px);margin:18px 0 6px;letter-spacing:-.02em}
+h2{font-size:clamp(17px,2.4vw,21px);margin:0 0 4px;letter-spacing:-.01em}
+h3{font-size:14px;margin:22px 0 8px;text-transform:uppercase;letter-spacing:.08em;color:var(--mut)}
+p{margin:9px 0}
+.claim{font-size:clamp(15px,2vw,18px);border-left:3px solid var(--acc);
+  padding:10px 0 10px 14px;margin:14px 0 4px}
+.sub{color:var(--mut);font-size:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;
+  padding:16px;margin:16px 0}
+.act{display:flex;gap:10px;align-items:baseline;margin-bottom:2px}
+.actno{font:700 11px/1.6 var(--mono);background:var(--acc);color:#fff;
+  border-radius:5px;padding:2px 7px;flex:none}
+.badge{display:inline-block;font:600 10px/1.7 var(--mono);letter-spacing:.06em;
+  padding:1px 7px;border-radius:99px;border:1px solid var(--line);
+  background:var(--chip);color:var(--mut);text-transform:uppercase;vertical-align:middle}
+.b-live{color:var(--ok);border-color:var(--ok)}
+.b-pub{color:var(--acc);border-color:var(--acc)}
+.b-pre{color:var(--warn);border-color:var(--warn)}
+.b-syn{color:var(--mut)}
+.row{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start}
+.grids{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-start}
+.gu{display:flex;flex-direction:column;gap:5px;align-items:center}
+.glab{font:600 10px/1.4 var(--mono);color:var(--mut);text-align:center;
+  text-transform:uppercase;letter-spacing:.05em}
+svg.grid{display:block;border-radius:4px;background:#000;
+  width:var(--gs,108px);height:var(--gs,108px)}
+.arrow{align-self:center;color:var(--mut);font-size:19px;padding-top:14px}
+button{font:600 13px var(--sans);padding:9px 14px;border-radius:9px;
+  border:1px solid var(--line);background:var(--card);color:var(--fg);cursor:pointer}
+button:hover{border-color:var(--acc)}
+button.pri{background:var(--acc);color:#fff;border-color:var(--acc)}
+button:disabled{opacity:.45;cursor:not-allowed}
+button:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.ctl{display:flex;gap:9px;flex-wrap:wrap;margin:12px 0 4px;align-items:center}
+.meters{display:flex;gap:9px;flex-wrap:wrap;margin-top:12px}
+.m{background:var(--chip);border:1px solid var(--line);border-radius:9px;
+  padding:8px 11px;font:12px/1.35 var(--mono);min-width:132px}
+.m b{display:block;font:600 9px/1.6 var(--mono);color:var(--mut);
+  text-transform:uppercase;letter-spacing:.07em}
+.ok{color:var(--ok)} .bad{color:var(--bad)} .warn{color:var(--warn)}
+table{border-collapse:collapse;width:100%;font-size:13px;margin:10px 0;display:block;
+  overflow-x:auto;white-space:nowrap}
+th,td{border-bottom:1px solid var(--line);padding:7px 9px;text-align:left}
+th{font:600 10px/1.6 var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--mut)}
+code,.mono{font-family:var(--mono);font-size:12.5px}
+pre{background:var(--chip);border:1px solid var(--line);border-radius:9px;
+  padding:12px;overflow-x:auto;font-size:12.5px;line-height:1.7}
+.eq{background:var(--chip);border-left:3px solid var(--acc);padding:11px 14px;
+  border-radius:0 8px 8px 0;font-family:var(--mono);font-size:13px;margin:10px 0;overflow-x:auto}
+.note{font-size:12.5px;color:var(--mut);border-top:1px dashed var(--line);
+  padding-top:9px;margin-top:12px}
+.hl{background:linear-gradient(transparent 62%,color-mix(in srgb,var(--acc) 32%,transparent) 0)}
+input[type=range]{accent-color:var(--acc);width:180px;vertical-align:middle}
+.statebar{height:9px;background:var(--chip);border-radius:99px;overflow:hidden;
+  border:1px solid var(--line)}
+.statefill{height:100%;background:var(--acc);width:0;transition:width .35s ease}
+.legend{display:flex;gap:6px;flex-wrap:wrap;font-size:11px}
+.foot{color:var(--mut);font-size:12.5px}
+canvas.state{image-rendering:pixelated;border-radius:6px;border:1px solid var(--line);
+  width:150px;height:150px;background:var(--chip)}
+.ro{display:flex;gap:5px;flex-wrap:wrap;margin:8px 0}
+.rc{display:flex;align-items:center;gap:3px;border:1px solid var(--line);border-radius:7px;
+  padding:3px 5px;background:var(--chip);font:11px var(--mono)}
+.sw{width:15px;height:15px;border-radius:3px;border:1px solid #0004;flex:none}
+.rc.good{border-color:var(--ok)} .rc.bad{border-color:var(--bad);opacity:.95}
+.hash{font:10.5px/1.5 var(--mono);word-break:break-all;color:var(--mut)}
+.predict{background:var(--chip);border:1px dashed var(--acc);border-radius:10px;padding:12px;margin:10px 0}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+a{color:var(--acc)}
+.big{font-size:19px;font-weight:700}
+.pill{display:inline-flex;gap:6px;align-items:center;background:var(--chip);
+  border:1px solid var(--line);border-radius:99px;padding:3px 10px;font:12px var(--mono)}
+@media(max-width:560px){svg.grid{--gs:84px}.m{min-width:0;flex:1 1 46%}}
+</style></head><body>
+
+<header><div class="hd">
+  <span class="kicker">DataForge 2026 · Pathway Track</span>
+  <span class="pill" id="parity">verifying engine…</span>
+  <span style="flex:1"></span>
+  <button id="theme" style="padding:5px 10px;font-size:12px">◐</button>
+</div></header>
+
+<div class="wrap">
+
+<h1>Where does a learned rule actually live?</h1>
+<div class="claim" id="claimline">
+A recurrent model with <b>frozen weights</b> can acquire an unseen colour rule purely by
+updating a <b>fixed-size state</b> as it reads demonstrations — and that state is the
+<span class="hl">sole carrier</span> of the rule: transplant it and the rule transplants with it,
+erase it and the rule is gone.
+</div>
+<p class="sub">
+Everything on this page marked <span class="badge b-live">live</span> is computed in your browser
+by a hand-written forward pass over a 298,720-parameter model trained for this artifact.
+Audience: anyone comfortable with "a neural network has weights". No ML background needed for
+Acts 1–3. <b>15 seconds:</b> press Forget.
+</p>
+<div class="legend" style="margin:10px 0 0">
+  <span class="badge b-live">live</span><span class="badge b-pre">precomputed</span>
+  <span class="badge b-pub">published</span><span class="badge b-syn">synthetic</span>
+  <span class="sub" style="font-size:11px">— every panel is labelled</span>
+</div>
+
+<!-- ACT 1 + 2 -->
+<div class="card">
+  <div class="act"><span class="actno">1</span><div>
+    <h2>Teach it a rule it has never seen <span class="badge b-live">live</span></h2>
+    <p class="sub">Each task invents a <b>fresh random colour permutation</b>. There are 9! = 362,880 of them,
+    so this particular rule was almost certainly never in training. The model must read it off the examples.</p>
+  </div></div>
+
+  <h3>Demonstrations <span style="text-transform:none;letter-spacing:0">— input → output</span></h3>
+  <div class="grids" id="demos"></div>
+
+  <h3>Held-out query</h3>
+  <div class="grids" id="a1q"></div>
+
+  <div class="ctl">
+    <button class="pri" id="btnForget">Forget the demonstrations</button>
+    <button id="btnNew">New task</button>
+    <span class="sub" id="a1state"></span>
+  </div>
+  <div class="statebar"><div class="statefill" id="a1bar"></div></div>
+
+  <div class="meters">
+    <div class="m"><b>strict grid</b><span id="m1"></span></div>
+    <div class="m"><b>cells correct</b><span id="m2"></span></div>
+    <div class="m"><b>‖Δθ‖ weights</b><span class="ok" id="m3">computing…</span></div>
+    <div class="m"><b>‖S‖ state</b><span id="m4"></span></div>
+    <div class="m"><b>inference</b><span id="m5"></span></div>
+  </div>
+
+  <h3>Read the rule out of the state <span class="badge b-live">live</span></h3>
+  <p class="sub">One extra forward pass on a probe grid containing every colour once. Whatever the model
+  emits at colour <i>c</i>'s cell <b>is</b> what the state says <i>c</i> maps to. This is the model's own
+  read-and-decode path, not a surrogate or a visualisation of something else.</p>
+  <div class="row" style="align-items:center">
+    <div style="flex:1 1 320px"><div class="ro" id="a1ro"></div>
+      <div class="sub mono" id="a1roscore"></div></div>
+    <div class="gu"><div class="glab">the state S, 128×128</div>
+      <canvas class="state" id="a1cv" width="128" height="128"></canvas></div>
+  </div>
+  <div class="note" id="a1note"></div>
+
+  <h3>Verify the weights never moved <span class="badge b-live">live</span></h3>
+  <p class="sub">SHA-256 computed in your browser over all 298,720 float32 parameters, before and after
+  ingesting the demonstrations. Not a stored string — recomputed on every click.</p>
+  <div class="hash" id="hashes">hashing…</div>
+</div>
+
+<!-- ACT 3 -->
+<div class="card">
+  <div class="act"><span class="actno">2</span><div>
+    <h2>Move the rule between two tasks <span class="badge b-live">live</span></h2>
+    <p class="sub">Two tasks share a palette but have <b>different permutations</b>. Both are solved correctly.
+    Now take the state built from A's demonstrations and drop it onto B's query. Nothing else changes —
+    same weights, same query, same code path.</p>
+  </div></div>
+
+  <div class="row">
+    <div style="flex:1 1 260px">
+      <h3>Task A</h3><div class="grids" id="tA"></div>
+    </div>
+    <div style="flex:1 1 260px">
+      <h3>Task B</h3><div class="grids" id="tB"></div>
+    </div>
+  </div>
+
+  <div class="predict" id="predbox">
+    <b>Before you press it — what will the model output?</b>
+    <div class="ctl" style="margin-bottom:0">
+      <button data-p="0">Noise / nothing sensible</button>
+      <button data-p="1">Still B's correct answer</button>
+      <button data-p="2">A's rule applied to B's input</button>
+    </div>
+    <div class="sub" id="predres" style="margin-top:7px"></div>
+  </div>
+  <div class="ctl">
+    <button class="pri" id="btnTrans">Move A's state into B</button>
+    <button id="btnReset">Restore B's own state</button>
+    <button id="btnNew2">New pair</button>
+  </div>
+
+  <h3>B's query, scored against both rules</h3>
+  <div class="grids" id="tOut"></div>
+  <div class="meters">
+    <div class="m"><b>vs rule B (correct for B)</b><span id="s1"></span></div>
+    <div class="m"><b>vs rule A applied to B</b><span id="s2"></span></div>
+    <div class="m"><b>state in use</b><span id="s3"></span></div>
+  </div>
+  <h3>The rule, decoded from whichever state is loaded <span class="badge b-live">live</span></h3>
+  <div class="ro" id="tro"></div>
+  <div class="note" id="tnote"></div>
+</div>
+
+<!-- ACT 4 -->
+<div class="card">
+  <div class="act"><span class="actno">3</span><div>
+    <h2>The limit: a binding it was never shown <span class="badge b-live">live</span></h2>
+    <p class="sub">The query below is <b>byte-identical</b> in both conditions. Only the demonstrations change.
+    One colour in the query never appears in the short demonstrations, so no binding for it can exist in the state.</p>
+  </div></div>
+  <div class="ctl">
+    <button id="cvShort" class="pri">Short context (3 demos)</button>
+    <button id="cvSup">Add 1 supporting demo</button>
+    <button id="btnNew3">New task</button>
+  </div>
+  <div class="grids" id="cvDemos"></div>
+  <h3>Same query, both conditions</h3>
+  <div class="grids" id="cvOut"></div>
+  <div class="meters">
+    <div class="m"><b>cells whose colour WAS shown</b><span id="c1"></span></div>
+    <div class="m"><b>cells whose colour was NOT shown</b><span id="c2"></span></div>
+    <div class="m"><b>strict grid</b><span id="c3"></span></div>
+  </div>
+  <h3>Decoded rule — watch the unbound colour <span class="badge b-live">live</span></h3>
+  <div class="ro" id="cvro"></div>
+  <div class="note" id="cvnote"></div>
+</div>
+
+<!-- ACT 5: interference -->
+<div class="card">
+  <div class="act"><span class="actno">4</span><div>
+    <h2>What a fixed-size carrier costs you <span class="badge b-live">live</span></h2>
+    <p class="sub">Because the write is additive, several tasks can be superposed into
+    <b>one</b> state: <code>S = S₁ + S₂ + …</code>. A growing key–value cache would simply store more.
+    A fixed-size state has to share. Slide it up and watch the rule dissolve.</p>
+  </div></div>
+  <div class="ctl">
+    <label for="ifK">rules superposed into one state</label>
+    <input type="range" id="ifK" min="1" max="6" value="1" aria-describedby="ifKv">
+    <span class="mono" id="ifKv">1</span>
+    <button id="ifNew">New set</button>
+  </div>
+  <div class="grids" id="ifOut"></div>
+  <div class="meters">
+    <div class="m"><b>strict grid</b><span id="i1"></span></div>
+    <div class="m"><b>cells</b><span id="i2"></span></div>
+    <div class="m"><b>decoded rule correct</b><span id="i3"></span></div>
+  </div>
+  <div class="ro" id="ifro"></div>
+  <div class="note" id="ifnote"></div>
+</div>
+
+<!-- EVIDENCE -->
+<div class="card">
+  <h2>Our measurements <span class="badge b-pre">precomputed</span></h2>
+  <p class="sub">Run over held-out tasks with a fixed evaluation seed by
+  <code>arcstate/experiments.py</code>. Strict grid = every one of the 36 cells correct.</p>
+  <div id="tables"></div>
+</div>
+
+<!-- BDH MODULE -->
+<div class="card">
+  <div class="act"><span class="actno">4</span><div>
+    <h2>Why build a model this way? BDH and BDH-CQ <span class="badge b-pub">published</span></h2>
+  </div></div>
+  <p>You have just watched a fixed-size state carry a rule. That is the design premise of
+  Pathway's <b>Dragon Hatchling (BDH)</b> family. In an ordinary Transformer, in-context learning
+  is carried by a key–value cache that <b>grows with every token</b>. In BDH the carrier is a
+  <b>recurrent associative state whose size does not depend on context length</b>.</p>
+
+  <h3>BDH: adaptation has somewhere to live</h3>
+  <p>BDH splits the model into a fixed ruleset (the trained weights) and an evolving ruleset σ —
+  a synaptic state updated by a Hebbian rule as the model reads. The design point is capacity:
+  a classical RNN carries O(n) state, a fast-weight system O(n²), and BDH deliberately sits between
+  them on a sparse graph of m synapses, <code>n ≪ m ≪ n²</code>. Because the state is
+  <b>parameter-scale</b>, a task rule can be held in it. BDH-GPU realises this as linear attention in a
+  high neuron dimension with ReLU-lowrank blocks and sparse positive activations (~5% of neurons active).
+  <span class="sub">Note: BDH is <b>not</b> an SSM in the Mamba sense — BDH-GPU is a separate formulation.</span></p>
+
+  <h3>BDH-CQ: the published interface</h3>
+  <p>BDH-CQ adds an interface for learning visual transformations from demonstrations. Given
+  demonstrations <code>D={(x_t,y_t)}</code> and query <code>x*</code>:</p>
+  <div class="eq">S_t = U_θ(S_{t-1}, D_t)                       (1)   θ stays fixed
+<span style="color:var(--mut)">     additive special case named in the paper:  S_t = S_{t-1} + U_θ(D_t)</span></div>
+  <div class="eq">H_0     = E_θ(x*, S_K)                       (2)
+H_{r+1} = F_θ(H_r, S_K),  r = 0 … R−1        (3)
+ŷ       = G_θ(H_R)                           (4)</div>
+  <p><b>The two states have different jobs.</b> <code>S</code> changes as evidence arrives and is what
+  in-context learning writes into. <code>H</code> carries the computation for the current query and is
+  never decoded into language. Conflating them is the most common misreading. Note that
+  <code>S_K</code> conditions the encoder <i>and every</i> reasoning step.</p>
+
+  <h3>Where our toy sits</h3>
+  <div id="difftable"></div>
+
+  <h3>Published BDH-CQ results <span class="badge b-pub">published</span></h3>
+  <div id="pubtable"></div>
+  <p class="note"><b>Evidence labelling.</b> The 29.5% figure is a <i>system</i> result, not an
+  architecture result: the evaluated system includes input transformations, candidate construction and
+  ranking. The paper reports an independent black-box audit that reproduced it — conducted by
+  <b>co-authors</b> from Bielik AI and NYU, without weights access, under a documented protocol. That is
+  stronger than a bare developer claim and weaker than a fully external replication, and it should be
+  called what it is. No BDH-CQ checkpoint is public and its dimensions and update rules are proprietary,
+  so <b>nobody</b> can faithfully reimplement it, us included.</p>
+</div>
+
+<!-- MISCONCEPTION -->
+<div class="card">
+  <h2>The misconception this artifact exists to kill</h2>
+  <div class="row">
+    <div style="flex:1 1 280px">
+      <p><span class="bad">✗ "The weights changed."</span><br>
+      They did not. The SHA-256 of the parameter buffer is identical before and after ingestion,
+      and <code>‖Δθ‖ = 0</code> exactly. No optimizer, no loss, no backward pass ran.</p>
+    </div>
+    <div style="flex:1 1 280px">
+      <p><span class="bad">✗ "Nothing was learned, an activation just changed."</span><br>
+      Also wrong. A linear-attention state update <i>is</i> fast-weight programming
+      (Schlag et al. 2021), and one linear self-attention layer implements one step of gradient descent
+      on a least-squares objective (von Oswald et al. 2023). Something with the algebraic form of
+      learning happened.</p>
+    </div>
+  </div>
+  <p><b>✓ The defensible statement.</b> The trained parameters are bit-identical before and after the
+  demonstrations. What changes is a fixed-size state whose update rule is baked into the architecture.
+  Whether you call that "learning" depends on whether you count the <i>implicit inner model</i>.
+  What is not in dispute is that no gradient step was taken.</p>
+  <h3>Words that are not synonyms</h3>
+  <div id="termtable"></div>
+</div>
+
+<!-- SANDBOX -->
+<div class="card">
+  <h2>Sandbox <span class="badge b-live">live</span></h2>
+  <p class="sub">Guided part is over. Break it.</p>
+  <div class="ctl">
+    <label>demonstrations <input type="range" id="sD" min="0" max="4" value="3"><span class="mono" id="sDv">3</span></label>
+    <label>latent steps R <input type="range" id="sR" min="1" max="8" value="3"><span class="mono" id="sRv">3</span></label>
+  </div>
+  <div class="ctl">
+    <label>distinct colours <input type="range" id="sP" min="2" max="9" value="4"><span class="mono" id="sPv">4</span></label>
+    <button id="sNew">New task</button>
+  </div>
+  <div class="grids" id="sxDemo"></div>
+  <div class="grids" id="sxOut"></div>
+  <div class="meters">
+    <div class="m"><b>strict grid</b><span id="x1"></span></div>
+    <div class="m"><b>cells</b><span id="x2"></span></div>
+    <div class="m"><b>‖S‖</b><span id="x3"></span></div>
+    <div class="m"><b>ms</b><span id="x4"></span></div>
+  </div>
+  <p class="note">Try: set demonstrations to 0. Set colours to 9 (training used 3–6). Sweep R —
+  it does nothing here, and that is a real finding, not a broken slider. See "honest limits" below.</p>
+</div>
+
+<!-- LIMITS -->
+<div class="card">
+  <h2>Honest limits — no hidden caps</h2>
+  <ul class="sub" id="limits"></ul>
+</div>
+
+<div class="card foot">
+  <h2 style="font-size:16px">Sources</h2>
+  <p><b>Primary.</b>
+  Engdahl et al. 2026, <i>BDH-CQ: In-Context Learning with Recurrent Latent Reasoning</i>, arXiv:2608.09888 ·
+  Kosowski et al. 2025, <i>The Dragon Hatchling</i>, arXiv:2509.26507 ·
+  Akyürek et al. 2024/2025, <i>The Surprising Effectiveness of Test-Time Training</i>, arXiv:2411.07279 ·
+  Hendel, Geva &amp; Globerson 2023, <i>In-Context Learning Creates Task Vectors</i>, EMNLP Findings ·
+  Zhu et al. 2025, <i>Reasoning by Superposition</i>, NeurIPS ·
+  Geiping et al. 2025, arXiv:2502.05171 ·
+  Moskvichev et al. 2023, <i>ConceptARC</i>, TMLR ·
+  Chollet 2019, arXiv:1911.01547 ·
+  Schlag, Irie &amp; Schmidhuber 2021, ICML ·
+  von Oswald et al. 2023, ICML ·
+  ARC Prize Foundation 2025, <i>The Hidden Drivers of HRM's Performance</i> (technical report).</p>
+  <p><b>Method disclosure.</b> The model, task generator, training loop, experiments, weight export and
+  the browser forward pass were written for this submission. Demonstration pairs are presented
+  cell-aligned (input and output colour of the same cell in one token); this restricts the trained family
+  to position-preserving transformations and is why the rule family is colour binding — which is also
+  BDH-CQ's own contextual-binding probe (§6.3). AI assistance was used for code, prose and research;
+  every component is documented in the repository README and defensible by the team.</p>
+</div>
+
+</div>
+
+<script id="modelspec" type="application/json">__MODEL_JSON__</script>
+<script id="resultspec" type="application/json">__RESULTS_JSON__</script>
+<script>__ENGINE_JS__</script>
+<script>
+const PAL=["#000000","#0074D9","#FF4136","#2ECC40","#FFDC00","#AAAAAA","#F012BE","#FF851B","#7FDBFF","#870C25"];
+const H=6,W=6,L=36,NC=10;
+const spec=JSON.parse(document.getElementById("modelspec").textContent);
+const RES=JSON.parse(document.getElementById("resultspec").textContent);
+const eng=new Engine(spec);
+
+/* ---------- parity self-check: the artifact tells you if it is broken ------ */
+(function(){const v=eng.verify();const el=document.getElementById("parity");
+ el.innerHTML=v.ok?`<span class="ok">●</span> engine verified vs PyTorch (Δ${v.maxAbs.toExponential(1)})`
+   :`<span class="bad">●</span> ENGINE PARITY FAILED — results below are not trustworthy`;})();
+
+/* ---------- task generator (mirrors arcstate/tasks.py) -------------------- */
+function ri(n){return Math.floor(Math.random()*n)}
+function shuf(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=ri(i+1);[a[i],a[j]]=[a[j],a[i]]}return a}
+function randPerm(){const p=[0].concat(shuf([1,2,3,4,5,6,7,8,9]));return p}
+function randPalette(k){return shuf([1,2,3,4,5,6,7,8,9]).slice(0,k).sort((a,b)=>a-b)}
+function randGrid(pal,fill=0.42){const g=new Array(L).fill(0);let n=0;
+  for(let i=0;i<L;i++) if(Math.random()<fill){g[i]=pal[ri(pal.length)];n++;}
+  while(n<3){const i=ri(L); if(g[i]===0){g[i]=pal[ri(pal.length)];n++;}} return g;}
+function plant(grids,pal){const seen=new Set();grids.forEach(g=>g.forEach(c=>seen.add(c)));
+  pal.forEach(c=>{if(!seen.has(c)){const g=grids[ri(grids.length)];g[ri(L)]=c;}}); return grids;}
+function applyRule(g,perm){return g.map(c=>perm[c])}
+function makeTask(k=3,palSize=4,perm=null,pal=null){
+  pal=pal||randPalette(palSize); perm=perm||randPerm();
+  let din=[]; for(let i=0;i<k;i++) din.push(randGrid(pal));
+  if(k>0) plant(din,pal);
+  const demos=din.map(x=>[x,applyRule(x,perm)]);
+  const qx=randGrid(pal), qy=applyRule(qx,perm);
+  return {perm,pal,demos,query:[qx,qy]};
+}
+function memTok(demos){const t=[];demos.forEach((d,i)=>{for(let p=0;p<L;p++)
+  t.push([d[0][p],d[1][p],Math.floor(p/W),p%W,i]);});return t;}
+function qTok(g){const t=[];for(let p=0;p<L;p++) t.push([g[p],0,Math.floor(p/W),p%W,2]);return t;}
+
+/* ---------- rendering ------------------------------------------------------ */
+function gridSVG(g,diff){let c="";
+  for(let p=0;p<L;p++){const r=Math.floor(p/W),cc=p%W;
+    c+=`<rect x="${cc*10}" y="${r*10}" width="10" height="10" fill="${PAL[g[p]]}" stroke="#2226" stroke-width=".4"/>`;
+    if(diff&&diff[p]) c+=`<rect x="${cc*10+1}" y="${r*10+1}" width="8" height="8" fill="none" stroke="#ff2d55" stroke-width="1.6"/>`;}
+  return `<svg class="grid" viewBox="0 0 60 60" role="img" aria-label="6 by 6 colour grid">${c}</svg>`;}
+function unit(lab,g,diff){return `<div class="gu"><div class="glab">${lab}</div>${gridSVG(g,diff)}</div>`;}
+function arrow(){return '<div class="arrow">→</div>'}
+function cmp(a,b){return a.map((v,i)=>v!==b[i])}
+function nCorrect(a,b){let n=0;for(let i=0;i<L;i++) if(a[i]===b[i])n++;return n}
+function run(demos,qgrid,R=3,stateFrom=null){
+  const t0=performance.now();
+  const src=stateFrom===null?demos:stateFrom;
+  const st=(src&&src.length)?eng.buildState(memTok(src)):{S:new Float32Array(spec.config.dk*spec.config.dv),z:new Float32Array(spec.config.dk)};
+  const qt=qTok(qgrid);
+  const {logits}=eng.solve(qt,st.S,st.z,R);
+  const pred=Array.from(eng.argmax(logits,L));
+  let nrm=0; for(let i=0;i<st.S.length;i++) nrm+=st.S[i]*st.S[i];
+  return {pred,ms:performance.now()-t0,norm:Math.sqrt(nrm),S:st.S,z:st.z};
+}
+function runWithState(S,z,qgrid,R=3){
+  const t0=performance.now();
+  const {logits}=eng.solve(qTok(qgrid),S,z,R);
+  return {pred:Array.from(eng.argmax(logits,L)),ms:performance.now()-t0};
+}
+
+/* ---------- rule readout: decode the binding straight out of S ------------- */
+const PROBE_POS=[[0,0],[0,2],[0,4],[2,0],[2,2],[2,4],[4,0],[4,2],[4,4]];
+const PROBE=(()=>{const g=new Array(L).fill(0);
+  PROBE_POS.forEach(([r,c],i)=>{g[r*W+c]=i+1;});return g;})();
+function decodeRule(S,z,R=3){
+  const p=Array.from(eng.argmax(eng.solve(qTok(PROBE),S,z,R).logits,L));
+  return PROBE_POS.map(([r,c])=>p[r*W+c]);           // decoded perm for colours 1..9
+}
+function drawReadout(el,dec,perm,pal){
+  el.innerHTML=dec.map((v,i)=>{const c=i+1,shown=pal.includes(c),ok=(v===perm[c]);
+    return `<span class="rc ${shown?(ok?'good':'bad'):''}" title="${shown?'demonstrated':'never demonstrated'}">
+      <span class="sw" style="background:${PAL[c]}"></span>→
+      <span class="sw" style="background:${PAL[v]}"></span>
+      ${shown?(ok?'<span class="ok">✓</span>':'<span class="bad">✗</span>')
+             :'<span class="sub" style="font-size:10px">unseen</span>'}</span>`;}).join("");
+}
+function readoutScore(dec,perm,pal){let a=0,b=0,c=0,d=0;
+  for(let i=1;i<=9;i++){ if(pal.includes(i)){b++; if(dec[i-1]===perm[i])a++;}
+    else {d++; if(dec[i-1]===perm[i])c++;} }
+  return {shown:[a,b],unseen:[c,d]};}
+
+/* ---------- state heatmap (the actual 128x128 matrix) ---------------------- */
+function drawState(cv,S){
+  const ctx=cv.getContext("2d"),img=ctx.createImageData(128,128);
+  let mx=1e-9; for(let i=0;i<S.length;i++){const a=Math.abs(S[i]); if(a>mx)mx=a;}
+  for(let i=0;i<128*128;i++){const v=S[i]/mx, o=i*4;
+    img.data[o]  =v>0?255:Math.round(255*(1+v));
+    img.data[o+1]=Math.round(255*(1-Math.abs(v)*0.85));
+    img.data[o+2]=v<0?255:Math.round(255*(1-v));
+    img.data[o+3]=255;}
+  ctx.putImageData(img,0,0);
+}
+
+/* ---------- live SHA-256 over the real parameter buffer ------------------- */
+function fnv(buf){let h=0x811c9dc5;const b=new Uint8Array(buf.buffer,buf.byteOffset,buf.byteLength);
+  for(let i=0;i<b.length;i++){h^=b[i];h=Math.imul(h,0x01000193)>>>0;}
+  return "fnv1a-"+h.toString(16).padStart(8,"0");}
+async function hashWeights(){
+  try{const d=await crypto.subtle.digest("SHA-256",eng.buf.buffer.slice(
+        eng.buf.byteOffset,eng.buf.byteOffset+eng.buf.byteLength));
+    return "sha256-"+Array.from(new Uint8Array(d)).map(x=>x.toString(16).padStart(2,"0")).join("");}
+  catch(e){return fnv(eng.buf);}}
+async function refreshHashes(){
+  const el=document.getElementById("hashes");
+  const before=await hashWeights();
+  const t=makeTask(3,4); run(t.demos,t.query[0]);      // do real work with the model
+  const after=await hashWeights();
+  const same=before===after;
+  el.innerHTML=`<div>before ingestion&nbsp; <b>${before}</b></div>
+    <div>after ingestion&nbsp;&nbsp; <b>${after}</b></div>
+    <div style="margin-top:5px">${same?'<span class="ok">● identical — not one of the 298,720 parameters moved</span>'
+      :'<span class="bad">● DIFFER</span>'}</div>`;
+  document.getElementById("m3").innerHTML=same?'<span class="ok">0.00000000</span>':'<span class="bad">CHANGED</span>';
+}
+
+/* ---------- ACT 1 ---------------------------------------------------------- */
+let A1=null,A1taught=true;
+function drawA1(){
+  const t=A1;
+  document.getElementById("demos").innerHTML=A1taught
+    ? t.demos.map((d,i)=>unit("demo "+(i+1),d[0])+arrow()+unit("→ output",d[1])).join("")
+    : `<p class="sub" style="margin:0">State erased. The model still has every one of its
+       298,720 weights — it simply has nowhere to have put the rule.</p>`;
+  const r=run(A1taught?t.demos:[],t.query[0]);
+  const tgt=t.query[1], ok=nCorrect(r.pred,tgt);
+  document.getElementById("a1q").innerHTML=
+    unit("query input",t.query[0])+arrow()+unit("model output",r.pred,cmp(r.pred,tgt))+unit("ground truth",tgt);
+  document.getElementById("m1").innerHTML=ok===L?'<span class="ok">SOLVED</span>':'<span class="bad">FAILED</span>';
+  document.getElementById("m2").textContent=ok+" / 36";
+  document.getElementById("m4").innerHTML=A1taught?r.norm.toExponential(3):'<span class="bad">0.000</span>';
+  document.getElementById("m5").textContent=r.ms.toFixed(0)+" ms";
+  document.getElementById("a1bar").style.width=(A1taught?100:0)+"%";
+  document.getElementById("a1state").textContent=A1taught?"state: built from 3 demonstrations":"state: zeroed";
+  document.getElementById("btnForget").textContent=A1taught?"Forget the demonstrations":"Teach it again";
+  const dec=decodeRule(r.S,r.z), sc=readoutScore(dec,t.perm,t.pal);
+  drawReadout(document.getElementById("a1ro"),dec,t.perm,t.pal);
+  document.getElementById("a1roscore").innerHTML=
+    `demonstrated colours decoded correctly: <b>${sc.shown[0]}/${sc.shown[1]}</b> ·
+     never-demonstrated: <b>${sc.unseen[0]}/${sc.unseen[1]}</b>
+     <span class="sub">(over 192 tasks: ${(RES.E12_readout['3'].colours_in_palette*100).toFixed(1)}% vs
+     ${(RES.E12_readout['3'].colours_never_shown*100).toFixed(1)}%)</span>`;
+  drawState(document.getElementById("a1cv"),r.S);
+  document.getElementById("a1note").innerHTML=A1taught
+    ? `The model has never seen this permutation — there are 362,880 and it was drawn just now.
+       The weights did not move: <code>‖Δθ‖ = 0</code> exactly, SHA-256 of the parameter buffer unchanged.
+       Everything that changed is in <code>S</code>.`
+    : `<b>This is the whole claim in one click.</b> Same weights, same query, same code path.
+       The only thing removed was the state — and the rule went with it.`;
+}
+document.getElementById("btnForget").onclick=()=>{A1taught=!A1taught;drawA1()};
+document.getElementById("btnNew").onclick=()=>{A1=makeTask(3,4);A1taught=true;drawA1()};
+
+/* ---------- ACT 2 : transplant --------------------------------------------- */
+let TA,TB,useA=false;
+function newPair(){const pal=randPalette(4);
+  let pa=randPerm(),pb=randPerm();
+  while(pal.every(c=>pa[c]===pb[c])) pb=randPerm();
+  TA=makeTask(3,4,pa,pal); TB=makeTask(3,4,pb,pal); useA=false; drawT();}
+function drawT(){
+  document.getElementById("tA").innerHTML=TA.demos.slice(0,2).map(d=>unit("in",d[0])+arrow()+unit("out",d[1])).join("");
+  document.getElementById("tB").innerHTML=TB.demos.slice(0,2).map(d=>unit("in",d[0])+arrow()+unit("out",d[1])).join("");
+  const src=useA?TA.demos:TB.demos;
+  const r=run(src,TB.query[0]);
+  const tgtB=TB.query[1], tgtAonB=applyRule(TB.query[0],TA.perm);
+  const okB=nCorrect(r.pred,tgtB), okA=nCorrect(r.pred,tgtAonB);
+  document.getElementById("tOut").innerHTML=
+    unit("B's query",TB.query[0])+arrow()+unit("model output",r.pred)+
+    unit("rule B (truth for B)",tgtB,cmp(r.pred,tgtB))+
+    unit("rule A applied to B",tgtAonB,cmp(r.pred,tgtAonB));
+  document.getElementById("s1").innerHTML=(okB===L?'<span class="ok">':'<span class="bad">')+okB+" / 36</span>";
+  document.getElementById("s2").innerHTML=(okA===L?'<span class="ok">':'<span class="bad">')+okA+" / 36</span>";
+  document.getElementById("s3").innerHTML=useA?'<span class="warn">A\u2019s state</span>':"B's own state";
+  const src2=useA?TA:TB, st2=eng.buildState(memTok(src2.demos));
+  drawReadout(document.getElementById("tro"),decodeRule(st2.S,st2.z),src2.perm,src2.pal);
+  document.getElementById("tnote").innerHTML=useA
+    ? `<b>Look at the second number, not the first.</b> The model is not confused and not producing noise —
+       it is applying <b>A's rule, exactly and confidently, to B's input</b>. A correct answer would only show
+       that the system works. A <i>predictably wrong</i> answer, produced by moving one named variable, shows
+       <span class="hl">where the rule lives</span>. Over 256 held-out pairs this scores
+       ${(RES.E3_transplant.transplant_vs_ruleA_on_B.grid*100).toFixed(1)}% strict-grid against rule A
+       and ${(RES.E3_transplant.transplant_vs_ruleB.grid*100).toFixed(1)}% against rule B.`
+    : `B solved with B's own state. Now press <b>Move A's state into B</b>. Predict first: what should appear?`;
+}
+document.querySelectorAll("#predbox button").forEach(b=>b.onclick=()=>{
+  const c=b.dataset.p==="2";
+  document.getElementById("predres").innerHTML=c
+    ? '<span class="ok">That is the answer — now press the button and watch it happen.</span>'
+    : '<span class="warn">Hold that thought. Press the button and see.</span>';});
+document.getElementById("btnTrans").onclick=()=>{useA=true;drawT()};
+document.getElementById("btnReset").onclick=()=>{useA=false;drawT()};
+document.getElementById("btnNew2").onclick=newPair;
+
+/* ---------- ACT 3 : coverage ------------------------------------------------ */
+let CV,cvSup=false;
+function newCv(){
+  const pal=randPalette(4), perm=randPerm();
+  const rest=[1,2,3,4,5,6,7,8,9].filter(c=>!pal.includes(c));
+  const extra=rest[ri(rest.length)];
+  const t=makeTask(3,4,perm,pal);
+  const qpal=pal.concat([extra]);
+  let qx=randGrid(qpal); if(!qx.includes(extra)){qx[ri(L)]=extra;}
+  let sx=randGrid(pal.concat([extra]));
+  for(let i=0;i<8;i++) sx[ri(L)]=extra;
+  t.query=[qx,applyRule(qx,perm)];
+  t.support=[sx,applyRule(sx,perm)];
+  t.extra=extra; CV=t; cvSup=false; drawCv();
+}
+function drawCv(){
+  const t=CV, demos=cvSup?t.demos.concat([t.support]):t.demos;
+  document.getElementById("cvDemos").innerHTML=
+    demos.map((d,i)=>unit((cvSup&&i===3?"SUPPORT demo 4":"demo "+(i+1)),d[0])+arrow()+unit("out",d[1])).join("");
+  const r=run(demos,t.query[0]);
+  const tgt=t.query[1];
+  document.getElementById("cvOut").innerHTML=
+    unit("query (identical)",t.query[0])+arrow()+unit("model output",r.pred,cmp(r.pred,tgt))+unit("ground truth",tgt);
+  let cA=0,cN=0,nA=0,nN=0;
+  for(let p=0;p<L;p++){const un=(t.query[0][p]===t.extra);
+    if(un){nN++;if(r.pred[p]===tgt[p])cN++;}else{nA++;if(r.pred[p]===tgt[p])cA++;}}
+  document.getElementById("c1").innerHTML=`<span class="ok">${cA} / ${nA}</span>`;
+  document.getElementById("c2").innerHTML=(cN===nN?'<span class="ok">':'<span class="bad">')+cN+" / "+nN+"</span>";
+  document.getElementById("c3").innerHTML=nCorrect(r.pred,tgt)===L?'<span class="ok">SOLVED</span>':'<span class="bad">FAILED</span>';
+  document.getElementById("cvShort").className=cvSup?"":"pri";
+  document.getElementById("cvSup").className=cvSup?"pri":"";
+  const stc=eng.buildState(memTok(demos));
+  drawReadout(document.getElementById("cvro"),decodeRule(stc.S,stc.z),CV.perm,
+              cvSup?CV.pal.concat([CV.extra]):CV.pal);
+  const E=RES.E5_coverage;
+  document.getElementById("cvnote").innerHTML=cvSup
+    ? `One demonstration containing colour <b style="color:${PAL[CV.extra]}">■</b> restores it. The query never changed.
+       Over 256 tasks the uncovered cells go from
+       <b>${(E.short_context.cell_uncovered*100).toFixed(1)}%</b> to
+       <b>${(E.supported_context.cell_uncovered*100).toFixed(1)}%</b>, and strict-grid from
+       ${(E.short_context.strict_grid*100).toFixed(1)}% to ${(E.supported_context.strict_grid*100).toFixed(1)}%.
+       <b>What looked like a reasoning limit was a demonstration-coverage artifact.</b>
+       This is the miniature of BDH-CQ's Table 3, where matched support took depth-5 nesting from 19/24 to 24/24.`
+    : `The model is near-perfect on every colour it was shown and gets colour
+       <b style="color:${PAL[CV.extra]}">■</b> wrong — measured at
+       <b>${(E.short_context.cell_uncovered*100).toFixed(1)}%</b>, i.e. <i>below</i> the
+       ${(E.chance_on_uncovered*100).toFixed(1)}% you would get by guessing. It is not guessing;
+       it is confidently applying a binding that does not exist. Now press
+       <b>Add 1 supporting demo</b>.`;
+}
+document.getElementById("cvShort").onclick=()=>{cvSup=false;drawCv()};
+document.getElementById("cvSup").onclick=()=>{cvSup=true;drawCv()};
+document.getElementById("btnNew3").onclick=newCv;
+
+/* ---------- ACT 4 : interference in one fixed-size state ------------------- */
+let IF=[];
+function newIf(){IF=[];for(let i=0;i<6;i++) IF.push(makeTask(3,4)); drawIf();}
+function drawIf(){
+  const K=+document.getElementById("ifK").value;
+  document.getElementById("ifKv").textContent=K;
+  const {dk,dv}=spec.config;
+  let S=new Float32Array(dk*dv), z=new Float32Array(dk);
+  for(let i=0;i<K;i++){const st=eng.buildState(memTok(IF[i].demos));
+    for(let j=0;j<S.length;j++) S[j]+=st.S[j];
+    for(let j=0;j<z.length;j++) z[j]+=st.z[j];}
+  const t=IF[0], r=runWithState(S,z,t.query[0]);
+  const tgt=t.query[1], ok=nCorrect(r.pred,tgt);
+  document.getElementById("ifOut").innerHTML=
+    unit("task 1 query",t.query[0])+arrow()+unit("model",r.pred,cmp(r.pred,tgt))+unit("truth",tgt);
+  document.getElementById("i1").innerHTML=ok===L?'<span class="ok">SOLVED</span>':'<span class="bad">FAILED</span>';
+  document.getElementById("i2").textContent=ok+" / 36";
+  const dec=decodeRule(S,z), sc=readoutScore(dec,t.perm,t.pal);
+  document.getElementById("i3").innerHTML=`${sc.shown[0]} / ${sc.shown[1]}`;
+  drawReadout(document.getElementById("ifro"),dec,t.perm,t.pal);
+  const E=RES.E11_interference;
+  document.getElementById("ifnote").innerHTML=K===1
+    ? `One rule in the state: clean. Now slide it up — each extra rule is written into the
+       <b>same 16,384 numbers</b>.`
+    : `${K} rules share one state. Over 192 tasks strict-grid falls
+       ${(E['1'].strict_grid*100).toFixed(1)}% → <b>${(E[String(K)].strict_grid*100).toFixed(1)}%</b> at K=${K}.
+       The bindings are still partly there — the decoded rule degrades gradually rather than
+       vanishing — which is what interference in a fixed-size associative memory looks like.
+       This is the cost the PS's own example claim points at: a fixed-shape state handles unbounded
+       input <i>but can still forget through interference</i>.`;
+}
+document.getElementById("ifK").oninput=drawIf;
+document.getElementById("ifNew").onclick=newIf;
+
+/* ---------- SANDBOX --------------------------------------------------------- */
+let SX;
+function newSx(){SX=makeTask(4,+document.getElementById("sP").value);drawSx()}
+function drawSx(){
+  const nd=+document.getElementById("sD").value, R=+document.getElementById("sR").value;
+  document.getElementById("sDv").textContent=nd;
+  document.getElementById("sRv").textContent=R;
+  document.getElementById("sPv").textContent=document.getElementById("sP").value;
+  const demos=SX.demos.slice(0,nd);
+  document.getElementById("sxDemo").innerHTML=nd? demos.map((d,i)=>unit("d"+(i+1),d[0])+arrow()+unit("out",d[1])).join("")
+    :'<p class="sub" style="margin:0">Zero demonstrations. The rule is not in the weights and not in the query.</p>';
+  const r=run(demos,SX.query[0],R);
+  const tgt=SX.query[1],ok=nCorrect(r.pred,tgt);
+  document.getElementById("sxOut").innerHTML=unit("query",SX.query[0])+arrow()+
+    unit("model",r.pred,cmp(r.pred,tgt))+unit("truth",tgt);
+  document.getElementById("x1").innerHTML=ok===L?'<span class="ok">SOLVED</span>':'<span class="bad">FAILED</span>';
+  document.getElementById("x2").textContent=ok+" / 36";
+  document.getElementById("x3").textContent=r.norm.toExponential(2);
+  document.getElementById("x4").textContent=r.ms.toFixed(0);
+}
+["sD","sR"].forEach(id=>document.getElementById(id).oninput=drawSx);
+document.getElementById("sP").oninput=newSx;
+document.getElementById("sNew").onclick=newSx;
+
+/* ---------- tables ---------------------------------------------------------- */
+function tbl(head,rows){return `<table><thead><tr>${head.map(h=>`<th>${h}</th>`).join("")}</tr></thead>
+  <tbody>${rows.map(r=>`<tr>${r.map(c=>`<td>${c}</td>`).join("")}</tr>`).join("")}</tbody></table>`;}
+const pc=x=>(x*100).toFixed(1)+"%";
+(function(){
+  const E1=RES.E1_demo_count,E2=RES.E2_ablations,E4=RES.E4_depth,E9=RES.E9_capacity,E6=RES.E6_consistency;
+  let h="<h3>Demonstrations are necessary</h3>"+tbl(["demos","cells","strict grid"],
+    ["0","1","2","3"].map(k=>[k,pc(E1[k].cell),pc(E1[k].strict_grid)]));
+  h+="<h3>What the state has to be</h3>"+tbl(["state supplied","cells","strict grid"],
+    [["the task's own state",pc(E2.correct_state.cell),pc(E2.correct_state.grid)],
+     ["zeroed",pc(E2.zero_state.cell),pc(E2.zero_state.grid)],
+     ["another task's state",pc(E2.wrong_task_state.cell),pc(E2.wrong_task_state.grid)],
+     ["random, scale-matched",pc(E2.random_state.cell),pc(E2.random_state.grid)]]);
+  h+="<h3>Transplant, 256 held-out pairs</h3>"+tbl(["condition","scored against","strict grid"],
+    [["B's own state","rule B",pc(RES.E3_transplant.native_vs_ruleB.grid)],
+     ["A's state on B's query","rule B",pc(RES.E3_transplant.transplant_vs_ruleB.grid)],
+     ["A's state on B's query","<b>rule A applied to B</b>","<b>"+pc(RES.E3_transplant.transplant_vs_ruleA_on_B.grid)+"</b>"],
+     ["rule collisions","—",pc(RES.E3_transplant.rule_collision_rate)]]);
+  h+="<h3>Latent reasoning steps — an honest negative result</h3>"+tbl(["R","strict grid","in trained range"],
+    Object.keys(E4).map(k=>[k,pc(E4[k].strict_grid),E4[k].trained_range?"yes":"no"]));
+  h+=`<p class="note">R does nothing here. Our task needs one associative lookup, so extra latent
+    steps have no work to do. We report this rather than hiding it — and it is why we did not build the
+    central claim on inference-time compute. BDH-CQ's own effort evidence is also mixed: LOW/MEDIUM/HIGH
+    gives 21/27/29.5% but the model was <i>trained</i> across effort levels, and their separate MIN-vs-STANDARD
+    comparison on the full evaluation is, in the authors' words, statistically unresolved (McNemar p = 0.167).</p>`;
+  h+="<h3>Binding capacity of a fixed-size state</h3>"+tbl(["distinct colours","strict grid","trained"],
+    Object.keys(E9).map(k=>[k,pc(E9[k].strict_grid),E9[k].in_training_range?"yes":"no"]));
+  h+=`<p class="note">Our 128×128 state holds all nine simultaneous bindings without a cliff, extrapolating
+    past the 3–6 seen in training. BDH-CQ reports the same shape: 24/24 at every level from 2 to 8 bindings.
+    Within-task consistency: pair accuracy ${pc(E6.pair_accuracy)} vs strict-task ${pc(E6.strict_task_accuracy)},
+    a gap of ${E6.gap_points} points — where BDH-CQ reports an 18.5-point gap on ConceptARC. Our toy applies
+    its rule consistently; the full system does not yet.</p>`;
+  const E11=RES.E11_interference,E12=RES.E12_readout;
+  h+="<h3>Reading the rule out of the state</h3>"+tbl(["demos","colours demonstrated","colours never shown"],
+    Object.keys(E12).map(k=>[k,pc(E12[k].colours_in_palette),pc(E12[k].colours_never_shown)]));
+  h+=`<p class="note">Chance is 11.1%. With three demonstrations the decoded mapping matches the true
+    permutation on ${pc(E12['3'].colours_in_palette)} of demonstrated colours and
+    ${pc(E12['3'].colours_never_shown)} of colours it was never shown. With zero demonstrations it sits at
+    ${pc(E12['0'].all9)} — the state says nothing because there is nothing in it.</p>`;
+  h+="<h3>Interference: K rules superposed into one state</h3>"+tbl(["rules in state","cells","strict grid"],
+    Object.keys(E11).map(k=>[k,pc(E11[k].cell),pc(E11[k].strict_grid)]));
+  document.getElementById("tables").innerHTML=h;
+
+  document.getElementById("difftable").innerHTML=tbl(["","BDH-CQ (published)","this toy"],[
+   ["status","150M-param system, ARC-AGI-1","298,720 params, 6×6 grids <span class='badge b-syn'>synthetic</span>"],
+   ["memory update","S_t = U_θ(S_{t-1},D_t), order-dependent","additive outer products — <b>exactly order-invariant</b>"],
+   ["state","proprietary dimensions","dense 128×128 = 16,384 entries"],
+   ["H_0","E_θ(x*, S_K) — reads the state","embedding only; state enters at every F step"],
+   ["reasoning","R latent steps, effort tiers","R latent steps, R has no effect on our task"],
+   ["pipeline","input transforms, candidates, ranking","none"],
+   ["rule family","full ARC","colour binding only (their §6.3 probe)"],
+   ["weights at inference","frozen","frozen — SHA-256 verified"]]);
+
+  document.getElementById("pubtable").innerHTML=tbl(["result","value","what it does and does not show"],[
+   ["ARC-AGI-1 public pass@2","29.5% (118/400)","system result; Wilson 25.2–34.2"],
+   ["computed cost","$0.00070 / task","from measured hardware time, not an API price"],
+   ["ConceptARC strict task","59.38%","vs 77.92% pair accuracy — an 18.5-point consistency gap"],
+   ["contextual binding","96/96 held-out","fresh permutation per task, so not memorisation"],
+   ["coverage (Table 3)","19/24 → 24/24","matched support removes the depth-5 nesting cliff"],
+   ["composition","colour swap 0/72 composed","confounded: it is only 26/72 <i>alone</i>"],
+   ["effort tiers","21 / 27 / 29.5%","model trained across effort levels"]]);
+
+  document.getElementById("termtable").innerHTML=tbl(["term","what changes","optimizer?","survives the task?"],[
+   ["fine-tuning","θ, the weights","yes","yes"],
+   ["test-time <b>training</b> (HRM, TRM, Akyürek)","θ or a per-instance LoRA","<b>yes</b>","usually discarded"],
+   ["test-time <b>adaptation</b>","behaviour on the test task","<i>either</i>","either"],
+   ["in-context learning","activations / KV cache (grows)","no","no"],
+   ["<b>state adaptation</b> (BDH-CQ, this artifact)","a <b>fixed-size</b> recurrent state","<b>no</b>","no"],
+   ["recurrent latent reasoning","workspace H over R steps","no","no"]]);
+
+  const lim=[
+   "Grids are fixed at 6×6, palette 10 colours (index 0 is background and is never permuted).",
+   "The trained rule family is colour binding only: a fresh permutation, position preserving. Structural operations (mirror, rotate, transpose) are <b>not</b> learned — we tried and report it as a limitation, not a feature.",
+   "Demonstration pairs are tokenised cell-aligned, which is what restricts the family above.",
+   "Training used 1–4 demonstrations, palettes of 3–6 colours, and R sampled from 1–5. Anything outside that is extrapolation and is labelled as such.",
+   "The state is a dense 128×128 matrix, not BDH's sparse synapse graph; state is ~5% of parameter count, whereas BDH deliberately targets parameter-scale state.",
+   "Our additive write is exactly order-invariant. BDH-CQ's is not. That is a difference between the systems, not a finding about BDH-CQ.",
+   "R has no measurable effect on our task. We do not reproduce latent-compute scaling and do not claim to.",
+   "This is a toy trained for teaching. It is <b>not</b> BDH-CQ, shares no weights or code with it, and no BDH-CQ checkpoint is public.",
+   "Everything marked live runs in your browser in float32; the engine self-checks against PyTorch at load."];
+  document.getElementById("limits").innerHTML=lim.map(x=>`<li>${x}</li>`).join("");
+})();
+
+/* ---------- theme + boot ---------------------------------------------------- */
+document.getElementById("theme").onclick=()=>{
+  const r=document.documentElement;
+  const cur=r.getAttribute("data-theme")||(matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light");
+  r.setAttribute("data-theme",cur==="dark"?"light":"dark");};
+A1=makeTask(3,4); drawA1(); newPair(); newCv(); newIf(); newSx(); refreshHashes();
+document.getElementById("btnForget").addEventListener("click",refreshHashes);
+</script>
+</body></html>

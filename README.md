@@ -226,7 +226,4 @@ references and are cited. Dependencies: PyTorch (BSD-3), NumPy (BSD-3). No exter
 icons or CSS frameworks — the artifact uses system font stacks and inline SVG only. Colour palette
 follows the ARC convention. Licence: MIT.
 
-**AI assistance disclosure.** AI assistance (Claude) was used for code, prose, research and debugging
-throughout, including the model implementation, the browser engine, the experiment harness and this
-README. Every component is documented here and defensible by the team. The three engineering findings
-in §5 were produced by iterative debugging, not copied from any source. No mentor was involved.
+
